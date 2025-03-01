@@ -5,6 +5,7 @@ interface StageConfig {
   gridSize: number;
   timeLimit: number;
   backgroundColor: number;
+  imageUrl?: string; // URL for AI-generated image
 }
 
 export class PuzzleScene extends Phaser.Scene {
@@ -30,9 +31,14 @@ export class PuzzleScene extends Phaser.Scene {
   
   // UI related
   private nextStageButton!: Phaser.GameObjects.Text;
+  private loadingText!: Phaser.GameObjects.Text;
   
   // Audio related
   private successSound: Phaser.Sound.WebAudioSound | null = null;
+
+  // Background
+  private background!: Phaser.GameObjects.Rectangle;
+  private bgPattern!: Phaser.GameObjects.TileSprite;
 
   constructor() {
     super({ key: 'PuzzleScene' });
@@ -40,7 +46,21 @@ export class PuzzleScene extends Phaser.Scene {
   }
 
   initStageConfigs() {
-    // Define configurations for all 10 stages
+    // Define configurations for all 10 stages with AI-generated image URLs
+    // These could be replaced with actual URLs from Midjourney/DALL-E
+    const aiGeneratedImages = [
+      'https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg', // Blue mountains
+      'https://images.pexels.com/photos/1761279/pexels-photo-1761279.jpeg', // Green forest
+      'https://images.pexels.com/photos/1831234/pexels-photo-1831234.jpeg', // Red sunset
+      'https://images.pexels.com/photos/1142941/pexels-photo-1142941.jpeg', // Orange beach
+      'https://images.pexels.com/photos/3075993/pexels-photo-3075993.jpeg', // Purple flowers
+      'https://images.pexels.com/photos/3732519/pexels-photo-3732519.jpeg', // Teal ocean
+      'https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg',   // Dark mountains
+      'https://images.pexels.com/photos/417070/pexels-photo-417070.jpeg',   // Amber sunset
+      'https://images.pexels.com/photos/2449600/pexels-photo-2449600.jpeg', // Emerald lake
+      'https://images.pexels.com/photos/3389536/pexels-photo-3389536.jpeg'  // Violet sky
+    ];
+
     for (let i = 1; i <= this.totalStages; i++) {
       // Gradually increase difficulty
       const gridSize = Math.min(2 + Math.floor((i - 1) / 2), 5); // 2x2 up to 5x5
@@ -63,7 +83,8 @@ export class PuzzleScene extends Phaser.Scene {
       this.stageConfigs.push({
         gridSize,
         timeLimit,
-        backgroundColor: colors[i - 1]
+        backgroundColor: colors[i - 1],
+        imageUrl: aiGeneratedImages[i - 1] // Each stage gets a different image
       });
     }
   }
@@ -72,7 +93,15 @@ export class PuzzleScene extends Phaser.Scene {
     // Load a set of colorful background patterns
     this.load.image('bg_pattern', 'https://opengameart.org/sites/default/files/styles/medium/public/seamless_grass_texture_by_calthyechild-d6jpnhk.png');
     
-    // Create placeholder textures for each stage
+    // Preload all AI-generated images for each stage
+    for (let i = 1; i <= this.totalStages; i++) {
+      const config = this.stageConfigs[i - 1];
+      if (config.imageUrl) {
+        this.load.image(`stage_image_${i}`, config.imageUrl);
+      }
+    }
+    
+    // Create placeholder textures for each stage as fallback
     for (let i = 1; i <= this.totalStages; i++) {
       this.createPlaceholderTexture(i);
     }
@@ -83,17 +112,26 @@ export class PuzzleScene extends Phaser.Scene {
     const centerY = this.cameras.main.centerY;
 
     // Create a more visually appealing background
-    const bgRect = this.add.rectangle(centerX, centerY, 800, 600, 0x282c34);
+    this.background = this.add.rectangle(centerX, centerY, 800, 600, 0x282c34);
     
     // Add pattern overlay to the background
     if (this.textures.exists('bg_pattern')) {
-      const pattern = this.add.tileSprite(centerX, centerY, 800, 600, 'bg_pattern');
-      pattern.setAlpha(0.1);
+      this.bgPattern = this.add.tileSprite(centerX, centerY, 800, 600, 'bg_pattern');
+      this.bgPattern.setAlpha(0.1);
     }
     
     // Create game area background
     this.add.rectangle(centerX, centerY, 600, 600, 0x21252b, 0.8)
       .setStrokeStyle(3, 0x61dafb);
+
+    // Create loading text (initially hidden)
+    this.loadingText = this.add.text(centerX, centerY, 'Loading Images...', {
+      fontSize: '24px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 20, y: 10 }
+    }).setOrigin(0.5).setDepth(1000);
+    this.loadingText.visible = false;
 
     // Create success sound
     this.createSuccessSound();
@@ -130,8 +168,46 @@ export class PuzzleScene extends Phaser.Scene {
     }
   }
 
+  // Create a function to generate images from AI services (you would implement API calls here)
+  async generateImageFromAI(prompt: string, stage: number): Promise<string> {
+    // This is a placeholder function - in a real implementation, you would:
+    // 1. Call the Midjourney/DALL-E API with the prompt
+    // 2. Wait for the response
+    // 3. Return the URL of the generated image
+    
+    // Example implementation with DALL-E (pseudocode):
+    /*
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_API_KEY'
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024'
+      })
+    });
+    
+    const data = await response.json();
+    return data.data[0].url;
+    */
+    
+    // For now, return the predefined URLs
+    return this.stageConfigs[stage - 1].imageUrl || '';
+  }
+
   createPlaceholderTexture(stageNum: number) {
     const textureName = `puzzle_placeholder_${stageNum}`;
+    
+    // Check if we already have an AI-generated image for this stage
+    const aiImageKey = `stage_image_${stageNum}`;
+    if (this.textures.exists(aiImageKey)) {
+      // If we have the image loaded, use it
+      this.placeholderTexture = stageNum === 1 ? aiImageKey : this.placeholderTexture;
+      return;
+    }
     
     try {
       // Create a canvas for our placeholder texture
@@ -246,6 +322,69 @@ export class PuzzleScene extends Phaser.Scene {
     }
   }
 
+  // Function to generate a new AI image for the given stage
+  async generateNewAIImage(stage: number) {
+    this.loadingText.visible = true;
+    this.loadingText.setText(`Generating image for Stage ${stage}...`);
+    
+    try {
+      // Generate appropriate prompts for each stage theme
+      const themes = [
+        "serene blue mountain landscape",
+        "lush green forest with sunlight",
+        "dramatic red sunset over mountains",
+        "orange autumn forest scene",
+        "purple lavender fields",
+        "teal ocean coastline",
+        "dark mountain silhouettes at dusk",
+        "amber golden hour landscape",
+        "emerald green tropical rainforest",
+        "violet night sky with stars"
+      ];
+      
+      const prompt = themes[stage - 1];
+      const imageUrl = await this.generateImageFromAI(prompt, stage);
+      
+      if (imageUrl) {
+        // Load the new image
+        this.load.image(`stage_image_${stage}`, imageUrl);
+        this.load.once('complete', () => {
+          // Update the stage config
+          this.stageConfigs[stage - 1].imageUrl = imageUrl;
+          // Restart the stage with the new image
+          this.startStage(stage);
+          this.loadingText.visible = false;
+        });
+        this.load.start();
+      } else {
+        throw new Error("Failed to generate image");
+      }
+    } catch (error) {
+      console.error("Error generating AI image:", error);
+      this.loadingText.setText("Error generating image. Using fallback...");
+      setTimeout(() => {
+        this.loadingText.visible = false;
+        this.startStage(stage);
+      }, 2000);
+    }
+  }
+
+  // Add a button to request a new AI image for the current stage
+  addNewImageButton() {
+    const centerX = this.cameras.main.centerX;
+    
+    this.add.text(centerX, 510, 'Generate New Image', {
+      fontSize: '18px',
+      color: '#ffffff',
+      backgroundColor: '#9b59b6',
+      padding: { x: 15, y: 8 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.generateNewAIImage(this.currentStage))
+      .setShadow(2, 2, 'rgba(0,0,0,0.5)', 3);
+  }
+
   createUI() {
     const centerX = this.cameras.main.centerX;
     
@@ -308,6 +447,9 @@ export class PuzzleScene extends Phaser.Scene {
     // Set initially dimmed
     this.nextStageButton.alpha = 0.5;
     this.nextStageButton.setName('nextStageButton');
+    
+    // Add button to generate new AI image
+    this.addNewImageButton();
   }
 
   startStage(stageNum: number) {
@@ -335,8 +477,14 @@ export class PuzzleScene extends Phaser.Scene {
       loop: true
     });
     
+    // Determine which texture to use - prefer AI-generated image if available
+    let textureToUse = `puzzle_placeholder_${stageNum}`;
+    if (this.textures.exists(`stage_image_${stageNum}`)) {
+      textureToUse = `stage_image_${stageNum}`;
+    }
+    
     // Create puzzle with the appropriate grid size
-    this.createPuzzle(config.gridSize, `puzzle_placeholder_${stageNum}`);
+    this.createPuzzle(config.gridSize, textureToUse);
     
     // Hide next stage button
     this.nextStageButton.alpha = 0.5;
@@ -536,7 +684,14 @@ export class PuzzleScene extends Phaser.Scene {
     // Only reset the current stage, not the entire game
     this.completed = false;
     const config = this.stageConfigs[this.currentStage - 1];
-    this.createPuzzle(config.gridSize, `puzzle_placeholder_${this.currentStage}`);
+    
+    // Determine which texture to use - prefer AI-generated image if available
+    let textureToUse = `puzzle_placeholder_${this.currentStage}`;
+    if (this.textures.exists(`stage_image_${this.currentStage}`)) {
+      textureToUse = `stage_image_${this.currentStage}`;
+    }
+    
+    this.createPuzzle(config.gridSize, textureToUse);
     
     // Reset timer for this stage
     this.timeLeft = config.timeLimit;

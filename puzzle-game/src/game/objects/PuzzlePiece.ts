@@ -11,6 +11,7 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
   private stageNumber: number = 1;
   private outlineGraphics: Phaser.GameObjects.Graphics | null = null;
   private pieceNumberText: Phaser.GameObjects.Text | null = null;
+  private imageCrop: Phaser.Geom.Rectangle | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -48,17 +49,41 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
 
     // Create the outline
     this.createOutline();
+    
+    // Get texture dimensions
+    const textureWidth = this.texture.source[0].width;
+    const textureHeight = this.texture.source[0].height;
+    
+    // Ensure the texture is loaded and valid
+    if (textureWidth > 0 && textureHeight > 0) {
+      // Calculate piece size in the original texture
+      const texturePieceWidth = textureWidth / gridSize;
+      const texturePieceHeight = textureHeight / gridSize;
+      
+      // Calculate frame crop for this piece
+      this.imageCrop = new Phaser.Geom.Rectangle(
+        col * texturePieceWidth,
+        row * texturePieceHeight,
+        texturePieceWidth,
+        texturePieceHeight
+      );
+      
+      // Apply the crop
+      this.setCrop(
+        this.imageCrop.x,
+        this.imageCrop.y,
+        this.imageCrop.width,
+        this.imageCrop.height
+      );
+    } else {
+      console.warn(`Texture ${texture} has invalid dimensions: ${textureWidth}x${textureHeight}`);
+    }
 
-    // Calculate frame crop for this piece
-    this.setCrop(
-      col * (this.texture.source[0].width / gridSize),
-      row * (this.texture.source[0].height / gridSize),
-      this.texture.source[0].width / gridSize,
-      this.texture.source[0].height / gridSize
-    );
-
-    // Set display size
+    // Set display size to match the piece size
     this.setDisplaySize(pieceSize, pieceSize);
+    
+    // Set origin to center for proper positioning
+    this.setOrigin(0.5);
     
     // Add piece number text for guidance
     this.addPieceNumber();
@@ -73,18 +98,23 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
       this.x - this.pieceSize / 2 + 5,
       this.y - this.pieceSize / 2 + 5,
       pieceName,
-      { fontSize: '16px', color: '#ffffff', backgroundColor: '#000000' }
+      { 
+        fontSize: '16px', 
+        color: '#ffffff',
+        backgroundColor: '#000000',
+        padding: { x: 3, y: 3 }
+      }
     );
     
     // Set origin to top-left
     this.pieceNumberText.setOrigin(0);
-    
-    // Update the position in preUpdate
+    this.pieceNumberText.setDepth(10); // Ensure text is on top
   }
 
   createOutline() {
     // Create a graphics object for the outline
     this.outlineGraphics = this.scene.add.graphics();
+    this.outlineGraphics.setDepth(5); // Set depth to be above the piece but below text
     
     // Draw the outline
     this.updateOutline();
@@ -134,6 +164,11 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
   setCorrect(value: boolean): void {
     this.correct = value;
     this.updateOutline();
+    
+    // Stop animation when in correct position
+    if (value) {
+      this.y = this.correctY; // Reset to exact position to stop any animation
+    }
   }
 
   isCorrect(): boolean {
