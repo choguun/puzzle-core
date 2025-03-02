@@ -57,13 +57,13 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
     // Ensure the texture is loaded and valid
     if (textureWidth > 0 && textureHeight > 0) {
       // Calculate piece size in the original texture
-      const texturePieceWidth = textureWidth / gridSize;
-      const texturePieceHeight = textureHeight / gridSize;
+      const texturePieceWidth = Math.floor(textureWidth / gridSize);
+      const texturePieceHeight = Math.floor(textureHeight / gridSize);
       
       // Calculate frame crop for this piece
       this.imageCrop = new Phaser.Geom.Rectangle(
-        col * texturePieceWidth,
-        row * texturePieceHeight,
+        Math.floor(col * texturePieceWidth),
+        Math.floor(row * texturePieceHeight),
         texturePieceWidth,
         texturePieceHeight
       );
@@ -167,6 +167,7 @@ export class PuzzlePiece extends Phaser.GameObjects.Sprite {
     
     // Stop animation when in correct position
     if (value) {
+      this.x = this.correctX; // Reset to exact position
       this.y = this.correctY; // Reset to exact position to stop any animation
     }
   }

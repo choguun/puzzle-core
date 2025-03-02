@@ -156,6 +156,7 @@ export class PuzzleScene extends Phaser.Scene {
 
       // Use the built-in sound manager to add a base64 encoded sound
       // This is a simple beep sound encoded as base64
+      const beepSound = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADTgCenp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6e//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAZtAAAAAAAAA04G5ePJAAAAAAD/+xDEAAAFlll9QMYA4KpILX80wAAgAANIAAAAQEBH///yEef//+AgQEBAQAAAdnZ2dn/Z2dndgIAAAAgQ/////4CAgP///wgACAAAGIP///8IGP////gYPAAAAAAA';
       this.cache.audio.add('success', beepSound);
       this.load.audio('success', beepSound);
       this.load.once('complete', () => {
