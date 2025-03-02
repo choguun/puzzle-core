@@ -156,7 +156,6 @@ export class PuzzleScene extends Phaser.Scene {
 
       // Use the built-in sound manager to add a base64 encoded sound
       // This is a simple beep sound encoded as base64
-      const beepSound = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADTgCenp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6e//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAZtAAAAAAAAA04G5ePJAAAAAAD/+xDEAAAFlll9QMYA4KpILX80wAAgAANIAAAAQEBH///yEef//+AgQEBAQAAAdnZ2dn/Z2dndgIAAAAgQ/////4CAgP///wgACAAAGIP///8IGP////gYPAAAAAAA';
       this.cache.audio.add('success', beepSound);
       this.load.audio('success', beepSound);
       this.load.once('complete', () => {
@@ -212,6 +211,7 @@ export class PuzzleScene extends Phaser.Scene {
     try {
       // Create a canvas for our placeholder texture
       const canvas = document.createElement('canvas');
+      // Make sure dimensions are evenly divisible by potential grid sizes (2x2, 3x3, 4x4, 5x5)
       canvas.width = 400;
       canvas.height = 400;
       const ctx = canvas.getContext('2d');
@@ -268,6 +268,28 @@ export class PuzzleScene extends Phaser.Scene {
       
       // Add the canvas to the game as a texture
       this.textures.addCanvas(textureName, canvas);
+      
+      // Draw grid lines for debugging
+      const gridSize = this.stageConfigs[stageNum - 1].gridSize;
+      const cellSize = 400 / gridSize;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1;
+      
+      // Draw vertical grid lines
+      for (let x = cellSize; x < 400; x += cellSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 400);
+        ctx.stroke();
+      }
+      
+      // Draw horizontal grid lines
+      for (let y = cellSize; y < 400; y += cellSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(400, y);
+        ctx.stroke();
+      }
       
       // Store the texture name for the first stage
       if (stageNum === 1) {
@@ -509,16 +531,27 @@ export class PuzzleScene extends Phaser.Scene {
     this.pieces.forEach(piece => piece.destroy());
     this.pieces = [];
     
-    const startX = this.cameras.main.centerX - ((gridSize * this.pieceSize) / 2) + (this.pieceSize / 2);
-    const startY = this.cameras.main.centerY - ((gridSize * this.pieceSize) / 2) + (this.pieceSize / 2);
+    // Reset any existing input listeners to avoid duplicates
+    this.input.off('dragstart');
+    this.input.off('drag');
+    this.input.off('dragend');
+    
+    // Calculate the total grid size and position it in the center
+    const totalGridSize = gridSize * this.pieceSize;
+    const startX = this.cameras.main.centerX - (totalGridSize / 2) + (this.pieceSize / 2);
+    const startY = this.cameras.main.centerY - (totalGridSize / 2) + (this.pieceSize / 2);
+    
+    console.log(`Grid dimensions: ${totalGridSize}x${totalGridSize}, starting at (${startX - this.pieceSize/2}, ${startY - this.pieceSize/2})`);
     
     // Create puzzle pieces
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
+        // Calculate the exact position for this piece
         const correctX = startX + (col * this.pieceSize);
         const correctY = startY + (row * this.pieceSize);
         
         // Generate random positions, but make sure they're not too far from the game area
+        // Keep pieces within a reasonable distance of the puzzle area
         const randX = this.cameras.main.centerX + Phaser.Math.Between(-250, 250);
         const randY = this.cameras.main.centerY + Phaser.Math.Between(-200, 200);
         
@@ -535,6 +568,9 @@ export class PuzzleScene extends Phaser.Scene {
           correctX,
           correctY
         );
+        
+        // Log piece creation for debugging
+        console.log(`Created piece (${row},${col}) at random (${randX},${randY}), correct position: (${correctX},${correctY})`);
         
         // Make pieces interactive
         piece.setInteractive();
@@ -564,6 +600,7 @@ export class PuzzleScene extends Phaser.Scene {
       this.selectedPiece = null;
       
       // Snap to position if close enough to correct position
+      // Increase the snap range slightly to help with positioning
       if (Phaser.Math.Distance.Between(gameObject.x, gameObject.y, gameObject.correctX, gameObject.correctY) < 50) {
         gameObject.x = gameObject.correctX;
         gameObject.y = gameObject.correctY;
@@ -573,12 +610,53 @@ export class PuzzleScene extends Phaser.Scene {
         this.checkCompletion();
       }
     });
+    
+    // Debug - draw grid to show where pieces should be placed
+    this.drawDebugGrid(startX - this.pieceSize/2, startY - this.pieceSize/2, gridSize, this.pieceSize);
+    
+    // Debug - log the number of pieces
+    console.log(`Created puzzle with ${this.pieces.length} pieces (grid size: ${gridSize}x${gridSize})`);
+  }
+  
+  drawDebugGrid(startX: number, startY: number, gridSize: number, cellSize: number) {
+    // Draw a debug grid to help visualize where pieces should go
+    const graphics = this.add.graphics();
+    graphics.lineStyle(1, 0x61dafb, 0.3);
+    
+    // Draw the outer border
+    graphics.strokeRect(startX, startY, gridSize * cellSize, gridSize * cellSize);
+    
+    // Draw the inner lines
+    for (let i = 1; i < gridSize; i++) {
+      // Vertical lines
+      graphics.beginPath();
+      graphics.moveTo(startX + (i * cellSize), startY);
+      graphics.lineTo(startX + (i * cellSize), startY + (gridSize * cellSize));
+      graphics.strokePath();
+      
+      // Horizontal lines
+      graphics.beginPath();
+      graphics.moveTo(startX, startY + (i * cellSize));
+      graphics.lineTo(startX + (gridSize * cellSize), startY + (i * cellSize));
+      graphics.strokePath();
+    }
+    
+    // Set a low depth so it's behind the pieces
+    graphics.setDepth(0);
   }
   
   checkCompletion() {
+    // Log the status of each piece for debugging
+    console.log("Checking completion...");
+    this.pieces.forEach((piece, index) => {
+      console.log(`Piece ${index}: correct = ${piece.isCorrect()}`);
+    });
+    
     const allCorrect = this.pieces.every(piece => piece.isCorrect());
+    console.log(`All pieces correct: ${allCorrect}`);
     
     if (allCorrect && !this.completed) {
+      console.log("Puzzle complete! Showing completion message.");
       this.completed = true;
       
       // Stop the timer
@@ -601,16 +679,58 @@ export class PuzzleScene extends Phaser.Scene {
       // Show completion message
       this.showMessage(`Stage ${this.currentStage} Completed!\n+${stageScore} points`, '#00aa00');
       
+      // Trigger blockchain event (if available)
+      this.recordStageCompletion(this.currentStage, stageScore);
+      
       // Enable next stage button if not at final stage
       if (this.currentStage < this.totalStages) {
         this.nextStageButton.alpha = 1;
+        // Make the button more visible with a pulse animation
+        this.tweens.add({
+          targets: this.nextStageButton,
+          scale: { from: 1, to: 1.1 },
+          duration: 500,
+          yoyo: true,
+          repeat: 2
+        });
       } else {
         // Show game completion message if at final stage
         this.time.delayedCall(2000, () => {
-          this.showMessage(`Congratulations!\nYou completed all stages!\nFinal Score: ${this.score}`, '#ffd700', 0.8);
+          this.showMessage(
+            `Congratulations!\nYou completed all stages!\nFinal Score: ${this.score}`,
+            '#ffd700',
+            0
+          );
+          
+          // Add NFT minting option on final completion
+          this.time.delayedCall(1000, () => {
+            const mintEvent = new CustomEvent('puzzleGameCompleted', {
+              detail: { score: this.score, showMintOption: true }
+            });
+            window.dispatchEvent(mintEvent);
+          });
         });
       }
     }
+  }
+  
+  // Method to record stage completion on the blockchain
+  recordStageCompletion(stageId: number, score: number) {
+    // Create a custom event that React components can listen for
+    const completionEvent = new CustomEvent('stageCompleted', {
+      detail: { 
+        stageId, 
+        score,
+        totalScore: this.score,
+        currentStage: this.currentStage,
+        totalStages: this.totalStages
+      }
+    });
+    
+    // Dispatch the event so React components can respond
+    window.dispatchEvent(completionEvent);
+    
+    console.log(`Stage ${stageId} completion recorded with score: ${score}`);
   }
   
   playSuccessSound() {
@@ -674,9 +794,13 @@ export class PuzzleScene extends Phaser.Scene {
   }
   
   goToNextStage() {
+    console.log(`Attempting to go to next stage. Current: ${this.currentStage}, Completed: ${this.completed}`);
     if (this.completed && this.currentStage < this.totalStages) {
+      console.log(`Moving to stage ${this.currentStage + 1}`);
       this.currentStage++;
       this.startStage(this.currentStage);
+    } else {
+      console.log("Cannot go to next stage - either not completed or at final stage");
     }
   }
   
